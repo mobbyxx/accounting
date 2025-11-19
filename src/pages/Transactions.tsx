@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { useTransactions } from '../hooks/useTransactions';
 import type { TransactionInput } from '../types';
-import { Trash2, Plus, Scan, Paperclip, FileText, Camera, Search, Filter, X } from 'lucide-react';
+import { Trash2, Plus, Scan, Paperclip, FileText, Camera, Search, Filter, X, Download, ChevronDown } from 'lucide-react';
 import { parseReceipt } from '../services/ocrService';
 import { CameraModal } from '../components/CameraModal';
 import { CATEGORIES } from '../constants/categories';
+import { exportTransactionsToCSV, exportTransactionsToExcel, exportTransactionsToPDF } from '../services/exportService';
 
 export const Transactions: React.FC = () => {
     const { transactions, addTransaction, deleteTransaction, getSummary } = useTransactions();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [showCamera, setShowCamera] = useState<'ocr' | 'attachment' | null>(null);
+    const [showExportMenu, setShowExportMenu] = useState(false);
     const [formData, setFormData] = useState<TransactionInput>({
         date: new Date().toISOString().split('T')[0],
         description: '',
@@ -102,6 +104,22 @@ export const Transactions: React.FC = () => {
 
     const summary = getSummary();
 
+    const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+        const timestamp = new Date().toISOString().split('T')[0];
+        switch (format) {
+            case 'csv':
+                exportTransactionsToCSV(transactions, `transaktionen_${timestamp}.csv`);
+                break;
+            case 'excel':
+                exportTransactionsToExcel(transactions, `transaktionen_${timestamp}.xlsx`);
+                break;
+            case 'pdf':
+                exportTransactionsToPDF(transactions, summary, `transaktionen_${timestamp}.pdf`);
+                break;
+        }
+        setShowExportMenu(false);
+    };
+
     return (
         <div className="animate-fade-in">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
@@ -135,6 +153,84 @@ export const Transactions: React.FC = () => {
                         <Filter size={18} />
                         Filter
                     </button>
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            disabled={transactions.length === 0}
+                        >
+                            <Download size={18} />
+                            Exportieren
+                            <ChevronDown size={16} />
+                        </button>
+                        {showExportMenu && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '0.5rem',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '10px',
+                                boxShadow: 'var(--shadow-lg)',
+                                overflow: 'hidden',
+                                zIndex: 1000,
+                                minWidth: '160px'
+                            }}>
+                                <button
+                                    onClick={() => handleExport('csv')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    CSV exportieren
+                                </button>
+                                <button
+                                    onClick={() => handleExport('excel')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    Excel exportieren
+                                </button>
+                                <button
+                                    onClick={() => handleExport('pdf')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    PDF exportieren
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <button className="btn btn-primary" onClick={() => setIsFormOpen(!isFormOpen)}>
                         {isFormOpen ? <X size={20} /> : <Plus size={20} />}
                         {isFormOpen ? 'Abbrechen' : 'Neue Buchung'}
