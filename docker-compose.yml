@@ -40,13 +40,11 @@ services:
 
   # Frontend + Backend Anwendung
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: 10.10.0.1:5000/accounting-v4
     container_name: accounting-web
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:80:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
