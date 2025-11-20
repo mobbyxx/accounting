@@ -324,6 +324,7 @@ export const Transactions: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
 
             {isFormOpen && (
                 <div className="card animate-fade-in" style={{ marginBottom: '2rem', border: '1px solid var(--primary-light)', boxShadow: 'var(--shadow-lg)' }}>
@@ -609,7 +610,6 @@ export const Transactions: React.FC = () => {
                     )}
                 </div>
             </div>
-            )}
 
             {showCamera && (
                 <CameraModal

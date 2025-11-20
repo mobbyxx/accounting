@@ -47,6 +47,66 @@ pool.on('connect', async (client) => {
     }
 });
 
+// Automatische Migration beim Server-Start
+const runMigrations = async () => {
+    const client = await pool.connect();
+    try {
+        console.log('🔄 Running database migrations...');
+
+        // Migration 1: Add user_id to transactions if not exists
+        await client.query(`
+            DO $$ 
+            BEGIN
+                -- Add user_id column if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = 'accounting' 
+                    AND table_name = 'transactions' 
+                    AND column_name = 'user_id'
+                ) THEN
+                    ALTER TABLE accounting.transactions 
+                    ADD COLUMN user_id UUID;
+                    
+                    RAISE NOTICE 'Added user_id column to transactions';
+                END IF;
+                
+                -- Add index if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_indexes 
+                    WHERE schemaname = 'accounting' 
+                    AND tablename = 'transactions' 
+                    AND indexname = 'idx_transactions_user_id'
+                ) THEN
+                    CREATE INDEX idx_transactions_user_id ON accounting.transactions(user_id);
+                    RAISE NOTICE 'Created index idx_transactions_user_id';
+                END IF;
+                
+                -- Add foreign key constraint if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints 
+                    WHERE constraint_schema = 'accounting' 
+                    AND table_name = 'transactions' 
+                    AND constraint_name = 'fk_transactions_user_id'
+                ) THEN
+                    -- Only add FK if user_id is populated (avoid errors with NULL values)
+                    -- In production, you might need to manually set user_id for existing transactions first
+                    -- ALTER TABLE accounting.transactions 
+                    -- ADD CONSTRAINT fk_transactions_user_id 
+                    -- FOREIGN KEY (user_id) REFERENCES accounting.users(id) ON DELETE CASCADE;
+                    RAISE NOTICE 'Skipped FK constraint (set user_id manually first)';
+                END IF;
+            END $$;
+        `);
+
+        console.log('✅ Database migrations completed');
+    } catch (err) {
+        console.error('❌ Migration error:', err);
+        // Don't crash the server, just log the error
+    } finally {
+        client.release();
+    }
+};
+
 // Cloudflare Team Domain (wird über ENV gesetzt)
 const CF_TEAM_DOMAIN = process.env.CF_TEAM_DOMAIN || 'your-team.cloudflareaccess.com';
 const CF_AUD = process.env.CF_AUD || ''; // Application Audience Tag
@@ -354,14 +414,31 @@ if (process.env.NODE_ENV === 'production') {
     });
 }
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📝 Mode: ${process.env.NODE_ENV || 'development'}`);
-    if (CF_TEAM_DOMAIN) {
-        console.log(`🔐 Cloudflare Team Domain: ${CF_TEAM_DOMAIN}`);
+// Server starten mit Migration
+const startServer = async () => {
+    try {
+        // Warte bis Datenbank bereit ist
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Führe Migrationen aus
+        await runMigrations();
+
+        // Starte Express Server
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`📝 Mode: ${process.env.NODE_ENV || 'development'}`);
+            if (CF_TEAM_DOMAIN) {
+                console.log(`🔐 Cloudflare Team Domain: ${CF_TEAM_DOMAIN}`);
+            }
+            console.log(`🗄️  Database: ${process.env.POSTGRES_HOST || 'localhost'}:${process.env.POSTGRES_PORT || 5432}/${process.env.POSTGRES_DB || 'accounting'}`);
+        });
+    } catch (err) {
+        console.error('Failed to start server:', err);
+        process.exit(1);
     }
-    console.log(`🗄️  Database: ${process.env.POSTGRES_HOST || 'localhost'}:${process.env.POSTGRES_PORT || 5432}/${process.env.POSTGRES_DB || 'accounting'}`);
-});
+};
+
+startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
