@@ -7,9 +7,20 @@ CREATE SCHEMA IF NOT EXISTS accounting;
 -- Setze Search Path
 SET search_path TO accounting, public;
 
--- Beispiel: Tabelle für Transaktionen (anpassen nach Bedarf)
+-- Benutzer-Tabelle für Cloudflare Authentication (muss vor transactions erstellt werden)
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cloudflare_sub VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Transaktionen-Tabelle mit User-Zuordnung
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
     date DATE NOT NULL,
     description TEXT NOT NULL,
     amount DECIMAL(12, 2) NOT NULL,
@@ -19,23 +30,15 @@ CREATE TABLE IF NOT EXISTS transactions (
     vat_amount DECIMAL(12, 2) DEFAULT 0.00,
     receipt_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Index für Performance
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
-
--- Beispiel: Tabelle für Benutzer (falls Authentication implementiert wird)
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 
 -- Funktion für automatisches Updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -8,7 +8,16 @@ import { CATEGORIES } from '../constants/categories';
 import { exportTransactionsToCSV, exportTransactionsToExcel, exportTransactionsToPDF } from '../services/exportService';
 
 export const Transactions: React.FC = () => {
-    const { transactions, addTransaction, deleteTransaction, getSummary } = useTransactions();
+    const {
+        transactions,
+        loading,
+        error: apiError,
+        needsMigration,
+        addTransaction,
+        deleteTransaction,
+        getSummary,
+        migrateFromLocalStorage
+    } = useTransactions();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [showCamera, setShowCamera] = useState<'ocr' | 'attachment' | null>(null);
@@ -146,101 +155,175 @@ export const Transactions: React.FC = () => {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <h1 className="header-title" style={{ marginBottom: 0 }}>Buchungen</h1>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <button className="btn btn-outline" style={{ flex: '1 1 auto' }}>
-                            <Filter size={18} />
-                            <span className="desktop-only">Filter</span>
-                        </button>
-                        <div style={{ position: 'relative', flex: '1 1 auto' }}>
-                            <button
-                                className="btn btn-outline"
-                                onClick={() => setShowExportMenu(!showExportMenu)}
-                                disabled={transactions.length === 0}
-                                style={{ width: '100%' }}
-                            >
-                                <Download size={18} />
-                                <span className="desktop-only">Exportieren</span>
-                                <ChevronDown size={16} />
-                            </button>
-                            {showExportMenu && (
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    right: 0,
-                                    marginTop: '0.5rem',
-                                    background: 'var(--bg-card)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '10px',
-                                    boxShadow: 'var(--shadow-lg)',
-                                    overflow: 'hidden',
-                                    zIndex: 1000,
-                                    minWidth: '160px'
-                                }}>
-                                    <button
-                                        onClick={() => handleExport('csv')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.75rem 1rem',
-                                            background: 'none',
-                                            border: 'none',
-                                            color: 'var(--text-primary)',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            transition: 'background-color 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    >
-                                        CSV exportieren
-                                    </button>
-                                    <button
-                                        onClick={() => handleExport('excel')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.75rem 1rem',
-                                            background: 'none',
-                                            border: 'none',
-                                            color: 'var(--text-primary)',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            transition: 'background-color 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    >
-                                        Excel exportieren
-                                    </button>
-                                    <button
-                                        onClick={() => handleExport('pdf')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.75rem 1rem',
-                                            background: 'none',
-                                            border: 'none',
-                                            color: 'var(--text-primary)',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            transition: 'background-color 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    >
-                                        PDF exportieren
-                                    </button>
-                                </div>
-                            )}
+            {/* Migration Banner */}
+            {needsMigration && (
+                <div className="card animate-fade-in" style={{
+                    marginBottom: '2rem',
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
+                    border: '1px solid var(--primary)',
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div>
+                            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: 'var(--primary)' }}>
+                                🔄 Lokale Daten gefunden
+                            </h3>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                Ihre Buchungen werden noch lokal gespeichert. Migrieren Sie diese in die Datenbank, um sie geräteübergreifend zu synchronisieren.
+                            </p>
                         </div>
-                        <button className="btn btn-primary" onClick={() => setIsFormOpen(!isFormOpen)} style={{ flex: '1 1 auto' }}>
-                            {isFormOpen ? <X size={20} /> : <Plus size={20} />}
-                            <span className="desktop-only">{isFormOpen ? 'Abbrechen' : 'Neue Buchung'}</span>
-                            <span className="mobile-only">{isFormOpen ? 'Zu' : 'Neu'}</span>
+                        <button
+                            className="btn btn-primary"
+                            onClick={async () => {
+                                const result = await migrateFromLocalStorage();
+                                if (result.success) {
+                                    alert(result.message || 'Migration erfolgreich!');
+                                } else {
+                                    alert('Migration fehlgeschlagen: ' + result.message);
+                                }
+                            }}
+                            style={{ whiteSpace: 'nowrap' }}
+                        >
+                            Jetzt migrieren
                         </button>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* API Error Banner */}
+            {apiError && (
+                <div className="card animate-fade-in" style={{
+                    marginBottom: '2rem',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid var(--danger)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                        <div>
+                            <h3 style={{ fontSize: '1rem', marginBottom: '0.25rem', color: 'var(--danger)' }}>Fehler</h3>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{apiError}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loading Spinner */}
+            {loading && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '4rem',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                }}>
+                    <div style={{
+                        width: '48px',
+                        height: '48px',
+                        border: '4px solid var(--border)',
+                        borderTop: '4px solid var(--primary)',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }}></div>
+                    <p style={{ color: 'var(--text-secondary)' }}>Lade Buchungen...</p>
+                </div>
+            )}
+
+            {!loading && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                        <h1 className="header-title" style={{ marginBottom: 0 }}>Buchungen</h1>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button className="btn btn-outline" style={{ flex: '1 1 auto' }}>
+                                <Filter size={18} />
+                                <span className="desktop-only">Filter</span>
+                            </button>
+                            <div style={{ position: 'relative', flex: '1 1 auto' }}>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={() => setShowExportMenu(!showExportMenu)}
+                                    disabled={transactions.length === 0}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Download size={18} />
+                                    <span className="desktop-only">Exportieren</span>
+                                    <ChevronDown size={16} />
+                                </button>
+                                {showExportMenu && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        right: 0,
+                                        marginTop: '0.5rem',
+                                        background: 'var(--bg-card)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '10px',
+                                        boxShadow: 'var(--shadow-lg)',
+                                        overflow: 'hidden',
+                                        zIndex: 1000,
+                                        minWidth: '160px'
+                                    }}>
+                                        <button
+                                            onClick={() => handleExport('csv')}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem 1rem',
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--text-primary)',
+                                                textAlign: 'left',
+                                                cursor: 'pointer',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                            CSV exportieren
+                                        </button>
+                                        <button
+                                            onClick={() => handleExport('excel')}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem 1rem',
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--text-primary)',
+                                                textAlign: 'left',
+                                                cursor: 'pointer',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                            Excel exportieren
+                                        </button>
+                                        <button
+                                            onClick={() => handleExport('pdf')}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem 1rem',
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--text-primary)',
+                                                textAlign: 'left',
+                                                cursor: 'pointer',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                            PDF exportieren
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button className="btn btn-primary" onClick={() => setIsFormOpen(!isFormOpen)} style={{ flex: '1 1 auto' }}>
+                                {isFormOpen ? <X size={20} /> : <Plus size={20} />}
+                                <span className="desktop-only">{isFormOpen ? 'Abbrechen' : 'Neue Buchung'}</span>
+                                <span className="mobile-only">{isFormOpen ? 'Zu' : 'Neu'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
             {isFormOpen && (
                 <div className="card animate-fade-in" style={{ marginBottom: '2rem', border: '1px solid var(--primary-light)', boxShadow: 'var(--shadow-lg)' }}>
@@ -526,6 +609,7 @@ export const Transactions: React.FC = () => {
                     )}
                 </div>
             </div>
+            )}
 
             {showCamera && (
                 <CameraModal

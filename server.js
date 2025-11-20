@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pkg from 'pg';
+const { Pool } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,13 +17,43 @@ if (!process.env.NODE_ENV) {
     process.env.NODE_ENV = 'development';
 }
 
+// PostgreSQL Connection Pool
+const pool = new Pool({
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: process.env.POSTGRES_PORT || 5432,
+    database: process.env.POSTGRES_DB || 'accounting',
+    user: process.env.POSTGRES_USER || 'accounting_user',
+    password: process.env.POSTGRES_PASSWORD,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
+
+// Test database connection
+pool.on('connect', () => {
+    console.log('✅ Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+    console.error('❌ Unexpected error on idle PostgreSQL client', err);
+});
+
+// Set search path for all queries
+pool.on('connect', async (client) => {
+    try {
+        await client.query('SET search_path TO accounting, public');
+    } catch (err) {
+        console.error('Error setting search_path:', err);
+    }
+});
+
 // Cloudflare Team Domain (wird über ENV gesetzt)
 const CF_TEAM_DOMAIN = process.env.CF_TEAM_DOMAIN || 'your-team.cloudflareaccess.com';
 const CF_AUD = process.env.CF_AUD || ''; // Application Audience Tag
 
 // CORS für Development
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Erhöht für Belegbilder
 
 // Cloudflare JWT Verification Middleware
 const verifyCloudflareJWT = async (req, res, next) => {
@@ -81,18 +113,235 @@ const verifyCloudflareJWT = async (req, res, next) => {
     }
 };
 
+// Hilfsfunktion: User in DB erstellen/aktualisieren
+const ensureUser = async (client, userInfo) => {
+    const { sub, email, name } = userInfo;
+
+    const result = await client.query(
+        `INSERT INTO users (cloudflare_sub, email, name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (cloudflare_sub) 
+         DO UPDATE SET email = $2, name = $3, updated_at = CURRENT_TIMESTAMP
+         RETURNING id`,
+        [sub, email, name]
+    );
+
+    return result.rows[0].id;
+};
+
 // API-Endpunkt für User-Informationen
-app.get('/api/user', verifyCloudflareJWT, (req, res) => {
-    res.json({
-        email: req.user.email,
-        name: req.user.name,
-        sub: req.user.sub,
-    });
+app.get('/api/user', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const client = await pool.connect();
+        try {
+            const userId = await ensureUser(client, req.user);
+            res.json({
+                email: req.user.email,
+                name: req.user.name,
+                sub: req.user.sub,
+                id: userId
+            });
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in /api/user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/transactions - Alle Transaktionen des Users laden
+app.get('/api/transactions', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const client = await pool.connect();
+        try {
+            const userId = await ensureUser(client, req.user);
+
+            const result = await client.query(
+                `SELECT id, date, description, amount, type, category, vat_rate, receipt_url, created_at
+                 FROM transactions
+                 WHERE user_id = $1
+                 ORDER BY date DESC, created_at DESC`,
+                [userId]
+            );
+
+            // Format für Frontend
+            const transactions = result.rows.map(row => ({
+                id: row.id,
+                date: row.date.toISOString().split('T')[0],
+                description: row.description,
+                amount: parseFloat(row.amount),
+                type: row.type,
+                category: row.category,
+                vatRate: parseFloat(row.vat_rate),
+                attachmentUrl: row.receipt_url,
+            }));
+
+            res.json(transactions);
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in GET /api/transactions:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/transactions - Neue Transaktion erstellen
+app.post('/api/transactions', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const { date, description, amount, type, category, vatRate, attachmentUrl } = req.body;
+
+        // Validierung
+        if (!date || !description || !amount || !type || !category) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        if (type !== 'income' && type !== 'expense') {
+            return res.status(400).json({ error: 'Invalid type' });
+        }
+
+        const client = await pool.connect();
+        try {
+            const userId = await ensureUser(client, req.user);
+
+            // VAT-Betrag berechnen
+            const vatAmount = (amount * (vatRate || 0)) / 100;
+
+            const result = await client.query(
+                `INSERT INTO transactions (user_id, date, description, amount, type, category, vat_rate, vat_amount, receipt_url)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 RETURNING id, date, description, amount, type, category, vat_rate, receipt_url, created_at`,
+                [userId, date, description, amount, type, category, vatRate || 0, vatAmount, attachmentUrl || null]
+            );
+
+            const row = result.rows[0];
+            const transaction = {
+                id: row.id,
+                date: row.date.toISOString().split('T')[0],
+                description: row.description,
+                amount: parseFloat(row.amount),
+                type: row.type,
+                category: row.category,
+                vatRate: parseFloat(row.vat_rate),
+                attachmentUrl: row.receipt_url,
+            };
+
+            res.status(201).json(transaction);
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in POST /api/transactions:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// DELETE /api/transactions/:id - Transaktion löschen (nur eigene)
+app.delete('/api/transactions/:id', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const client = await pool.connect();
+        try {
+            const userId = await ensureUser(client, req.user);
+
+            // Nur eigene Transaktionen löschen
+            const result = await client.query(
+                `DELETE FROM transactions WHERE id = $1 AND user_id = $2 RETURNING id`,
+                [id, userId]
+            );
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({ error: 'Transaction not found or unauthorized' });
+            }
+
+            res.json({ success: true, id });
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in DELETE /api/transactions/:id:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/sync - localStorage-Daten in DB übertragen
+app.post('/api/sync', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const { transactions } = req.body;
+
+        if (!Array.isArray(transactions)) {
+            return res.status(400).json({ error: 'Invalid data format' });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const userId = await ensureUser(client, req.user);
+
+            let imported = 0;
+            let skipped = 0;
+
+            for (const t of transactions) {
+                try {
+                    // Prüfen, ob ID bereits existiert (Duplikate vermeiden)
+                    const exists = await client.query(
+                        'SELECT id FROM transactions WHERE id = $1',
+                        [t.id]
+                    );
+
+                    if (exists.rowCount > 0) {
+                        skipped++;
+                        continue;
+                    }
+
+                    const vatAmount = (t.amount * (t.vatRate || 0)) / 100;
+
+                    await client.query(
+                        `INSERT INTO transactions (id, user_id, date, description, amount, type, category, vat_rate, vat_amount, receipt_url)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                        [t.id, userId, t.date, t.description, t.amount, t.type, t.category, t.vatRate || 0, vatAmount, t.attachmentUrl || null]
+                    );
+
+                    imported++;
+                } catch (err) {
+                    console.error('Error importing transaction:', t.id, err);
+                    skipped++;
+                }
+            }
+
+            await client.query('COMMIT');
+
+            res.json({
+                success: true,
+                imported,
+                skipped,
+                message: `${imported} Transaktionen importiert, ${skipped} übersprungen.`
+            });
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in POST /api/sync:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Health Check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
+app.get('/api/health', async (req, res) => {
+    try {
+        const client = await pool.connect();
+        await client.query('SELECT 1');
+        client.release();
+        res.json({ status: 'ok', database: 'connected' });
+    } catch (error) {
+        res.status(503).json({ status: 'error', database: 'disconnected' });
+    }
 });
 
 // Serve static files from the React app in production
@@ -111,4 +360,12 @@ app.listen(PORT, () => {
     if (CF_TEAM_DOMAIN) {
         console.log(`🔐 Cloudflare Team Domain: ${CF_TEAM_DOMAIN}`);
     }
+    console.log(`🗄️  Database: ${process.env.POSTGRES_HOST || 'localhost'}:${process.env.POSTGRES_PORT || 5432}/${process.env.POSTGRES_DB || 'accounting'}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    await pool.end();
+    process.exit(0);
 });
