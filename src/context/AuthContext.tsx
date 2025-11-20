@@ -61,8 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthenticated(false);
         setUser(null);
         sessionStorage.removeItem(SESSION_KEY);
-        // Redirect to Cloudflare Access logout
-        window.location.href = '/cdn-cgi/access/logout';
+
+        // Redirect to Cloudflare Access logout only in production
+        if (!import.meta.env.DEV) {
+            window.location.href = '/cdn-cgi/access/logout';
+        }
     };
 
     return (

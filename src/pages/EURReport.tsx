@@ -48,88 +48,90 @@ export const EURReport: React.FC = () => {
 
     return (
         <div className="animate-fade-in">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-                <div>
-                    <h1 className="header-title" style={{ marginBottom: '0.5rem' }}>Einnahmenüberschussrechnung</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Detaillierte Auswertung Ihrer geschäftlichen Finanzen.</p>
-                </div>
-                <div style={{ position: 'relative' }}>
-                    <button
-                        className="btn btn-outline"
-                        onClick={() => setShowExportMenu(!showExportMenu)}
-                        disabled={transactions.length === 0}
-                    >
-                        <Download size={18} />
-                        Exportieren
-                        <ChevronDown size={16} />
-                    </button>
-                    {showExportMenu && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '100%',
-                            right: 0,
-                            marginTop: '0.5rem',
-                            background: 'var(--bg-card)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '10px',
-                            boxShadow: 'var(--shadow-lg)',
-                            overflow: 'hidden',
-                            zIndex: 1000,
-                            minWidth: '160px'
-                        }}>
-                            <button
-                                onClick={() => handleExport('csv')}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                                CSV exportieren
-                            </button>
-                            <button
-                                onClick={() => handleExport('excel')}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                                Excel exportieren
-                            </button>
-                            <button
-                                onClick={() => handleExport('pdf')}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            >
-                                PDF exportieren
-                            </button>
-                        </div>
-                    )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                        <h1 className="header-title" style={{ marginBottom: '0.5rem' }}>Einnahmenüberschussrechnung</h1>
+                        <p style={{ color: 'var(--text-secondary)' }}>Detaillierte Auswertung Ihrer geschäftlichen Finanzen.</p>
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            disabled={transactions.length === 0}
+                        >
+                            <Download size={18} />
+                            <span className="desktop-only">Exportieren</span>
+                            <ChevronDown size={16} />
+                        </button>
+                        {showExportMenu && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '0.5rem',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '10px',
+                                boxShadow: 'var(--shadow-lg)',
+                                overflow: 'hidden',
+                                zIndex: 1000,
+                                minWidth: '160px'
+                            }}>
+                                <button
+                                    onClick={() => handleExport('csv')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    CSV exportieren
+                                </button>
+                                <button
+                                    onClick={() => handleExport('excel')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    Excel exportieren
+                                </button>
+                                <button
+                                    onClick={() => handleExport('pdf')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    PDF exportieren
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

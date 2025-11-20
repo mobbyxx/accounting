@@ -10,6 +10,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Default to development if not set
+if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = 'development';
+}
+
 // Cloudflare Team Domain (wird über ENV gesetzt)
 const CF_TEAM_DOMAIN = process.env.CF_TEAM_DOMAIN || 'your-team.cloudflareaccess.com';
 const CF_AUD = process.env.CF_AUD || ''; // Application Audience Tag
@@ -20,6 +25,16 @@ app.use(express.json());
 
 // Cloudflare JWT Verification Middleware
 const verifyCloudflareJWT = async (req, res, next) => {
+    // Development Bypass
+    if (process.env.NODE_ENV === 'development') {
+        req.user = {
+            email: 'dev@local.test',
+            name: 'Dev User',
+            sub: 'dev-user-123',
+        };
+        return next();
+    }
+
     try {
         const token = req.headers['cf-access-jwt-assertion'];
 

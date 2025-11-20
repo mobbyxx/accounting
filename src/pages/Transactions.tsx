@@ -146,95 +146,99 @@ export const Transactions: React.FC = () => {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h1 className="header-title" style={{ marginBottom: 0 }}>Buchungen</h1>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button className="btn btn-outline">
-                        <Filter size={18} />
-                        Filter
-                    </button>
-                    <div style={{ position: 'relative' }}>
-                        <button
-                            className="btn btn-outline"
-                            onClick={() => setShowExportMenu(!showExportMenu)}
-                            disabled={transactions.length === 0}
-                        >
-                            <Download size={18} />
-                            Exportieren
-                            <ChevronDown size={16} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <h1 className="header-title" style={{ marginBottom: 0 }}>Buchungen</h1>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline" style={{ flex: '1 1 auto' }}>
+                            <Filter size={18} />
+                            <span className="desktop-only">Filter</span>
                         </button>
-                        {showExportMenu && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '100%',
-                                right: 0,
-                                marginTop: '0.5rem',
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--border)',
-                                borderRadius: '10px',
-                                boxShadow: 'var(--shadow-lg)',
-                                overflow: 'hidden',
-                                zIndex: 1000,
-                                minWidth: '160px'
-                            }}>
-                                <button
-                                    onClick={() => handleExport('csv')}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.75rem 1rem',
-                                        background: 'none',
-                                        border: 'none',
-                                        color: 'var(--text-primary)',
-                                        textAlign: 'left',
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                >
-                                    CSV exportieren
-                                </button>
-                                <button
-                                    onClick={() => handleExport('excel')}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.75rem 1rem',
-                                        background: 'none',
-                                        border: 'none',
-                                        color: 'var(--text-primary)',
-                                        textAlign: 'left',
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                >
-                                    Excel exportieren
-                                </button>
-                                <button
-                                    onClick={() => handleExport('pdf')}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.75rem 1rem',
-                                        background: 'none',
-                                        border: 'none',
-                                        color: 'var(--text-primary)',
-                                        textAlign: 'left',
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                >
-                                    PDF exportieren
-                                </button>
-                            </div>
-                        )}
+                        <div style={{ position: 'relative', flex: '1 1 auto' }}>
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => setShowExportMenu(!showExportMenu)}
+                                disabled={transactions.length === 0}
+                                style={{ width: '100%' }}
+                            >
+                                <Download size={18} />
+                                <span className="desktop-only">Exportieren</span>
+                                <ChevronDown size={16} />
+                            </button>
+                            {showExportMenu && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    right: 0,
+                                    marginTop: '0.5rem',
+                                    background: 'var(--bg-card)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '10px',
+                                    boxShadow: 'var(--shadow-lg)',
+                                    overflow: 'hidden',
+                                    zIndex: 1000,
+                                    minWidth: '160px'
+                                }}>
+                                    <button
+                                        onClick={() => handleExport('csv')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.75rem 1rem',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-primary)',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        CSV exportieren
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('excel')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.75rem 1rem',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-primary)',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        Excel exportieren
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('pdf')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.75rem 1rem',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-primary)',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-app)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        PDF exportieren
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <button className="btn btn-primary" onClick={() => setIsFormOpen(!isFormOpen)} style={{ flex: '1 1 auto' }}>
+                            {isFormOpen ? <X size={20} /> : <Plus size={20} />}
+                            <span className="desktop-only">{isFormOpen ? 'Abbrechen' : 'Neue Buchung'}</span>
+                            <span className="mobile-only">{isFormOpen ? 'Zu' : 'Neu'}</span>
+                        </button>
                     </div>
-                    <button className="btn btn-primary" onClick={() => setIsFormOpen(!isFormOpen)}>
-                        {isFormOpen ? <X size={20} /> : <Plus size={20} />}
-                        {isFormOpen ? 'Abbrechen' : 'Neue Buchung'}
-                    </button>
                 </div>
             </div>
 
@@ -378,7 +382,8 @@ export const Transactions: React.FC = () => {
                 </div>
             )}
 
-            <div className="card table-container">
+            {/* Desktop Table View */}
+            <div className="card table-container desktop-only">
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
                     <thead>
                         <tr>
@@ -447,6 +452,79 @@ export const Transactions: React.FC = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="mobile-only">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {transactions.map((t) => (
+                        <div key={t.id} className="card" style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                                <div>
+                                    <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{t.description}</div>
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                        {new Date(t.date).toLocaleDateString('de-DE')}
+                                    </div>
+                                </div>
+                                <div style={{ fontWeight: 'bold', color: t.type === 'income' ? 'var(--success)' : 'var(--danger)', fontSize: '1.125rem' }}>
+                                    {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                                <span style={{
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '999px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    fontSize: '0.75rem',
+                                    border: '1px solid var(--border)'
+                                }}>
+                                    {t.category}
+                                </span>
+                                <span style={{
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '999px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    fontSize: '0.75rem',
+                                    border: '1px solid var(--border)',
+                                    color: 'var(--text-secondary)'
+                                }}>
+                                    {t.vatRate}% USt.
+                                </span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                                {t.attachmentUrl && (
+                                    <a
+                                        href={t.attachmentUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-outline"
+                                        style={{ padding: '0.5rem', fontSize: '0.875rem' }}
+                                    >
+                                        <FileText size={16} style={{ marginRight: '0.5rem' }} />
+                                        Beleg
+                                    </a>
+                                )}
+                                <button
+                                    className="btn btn-outline"
+                                    style={{ padding: '0.5rem', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                                    onClick={() => deleteTransaction(t.id)}
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    {transactions.length === 0 && (
+                        <div className="card" style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                <Search size={48} opacity={0.2} />
+                                <p>Keine Buchungen gefunden.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {showCamera && (

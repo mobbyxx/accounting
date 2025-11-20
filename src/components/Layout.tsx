@@ -1,5 +1,5 @@
-import React from 'react';
-import { LayoutDashboard, Receipt, PieChart, Settings, Wallet, LogOut, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { LayoutDashboard, Receipt, PieChart, Settings, Wallet, LogOut, User, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -61,6 +61,7 @@ const LoggedInUser: React.FC = () => {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -68,9 +69,32 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/eur-report', label: 'EÜR Bericht', icon: PieChart },
   ];
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <div className="app-layout">
-      <aside className="sidebar glass-panel">
+      {/* Mobile Menu Toggle Button */}
+      <button
+        className="mobile-menu-toggle"
+        onClick={toggleMobileMenu}
+        aria-label="Toggle menu"
+      >
+        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {/* Mobile Overlay */}
+      <div
+        className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`}
+        onClick={closeMobileMenu}
+      />
+
+      <aside className={`sidebar glass-panel ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         <div style={{ marginBottom: '3rem', display: 'flex', alignItems: 'center', gap: '0.75rem', paddingLeft: '0.5rem' }}>
           <div style={{
             width: '40px',
@@ -99,6 +123,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 key={item.path}
                 to={item.path}
                 className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={closeMobileMenu}
               >
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{item.label}</span>
@@ -117,7 +142,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
 
         <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-          <Link to="/settings" className="nav-item">
+          <Link to="/settings" className="nav-item" onClick={closeMobileMenu}>
             <Settings size={20} />
             <span>Einstellungen</span>
           </Link>

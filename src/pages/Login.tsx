@@ -33,12 +33,13 @@ export const Login: React.FC = () => {
             padding: '1rem'
         }}>
             <div className="card glass-panel animate-fade-in" style={{
-                width: '100%',
-                maxWidth: '420px',
+                width: '90%',
+                maxWidth: '400px',
                 textAlign: 'center',
-                padding: '2.5rem',
+                padding: '2rem',
                 border: '1px solid var(--glass-border)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                margin: '1rem'
             }}>
                 <div style={{
                     display: 'inline-flex',
