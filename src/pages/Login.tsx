@@ -1,42 +1,27 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Lock, ChevronRight, ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
-    const { hasPin, login, setupPin } = useAuth();
-    const [pin, setPin] = useState('');
-    const [confirmPin, setConfirmPin] = useState('');
-    const [error, setError] = useState('');
+    const { isAuthenticated, loading, checkAuth } = useAuth();
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-
-        if (!hasPin) {
-            // Setup mode
-            if (pin.length < 4) {
-                setError('PIN muss mindestens 4 Zeichen lang sein.');
-                return;
-            }
-            if (pin !== confirmPin) {
-                setError('PINs stimmen nicht überein.');
-                return;
-            }
-            setupPin(pin);
-            navigate('/');
-        } else {
-            // Login mode
-            const success = login(pin);
-            if (success) {
-                navigate('/');
-            } else {
-                setError('Falscher PIN.');
-                setPin('');
-            }
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/', { replace: true });
         }
-    };
+    }, [isAuthenticated, navigate]);
+
+    useEffect(() => {
+        // Retry authentication check after a delay if not authenticated
+        if (!loading && !isAuthenticated) {
+            const timer = setTimeout(() => {
+                checkAuth();
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [loading, isAuthenticated, checkAuth]);
 
     return (
         <div style={{
@@ -65,88 +50,58 @@ export const Login: React.FC = () => {
                     border: '1px solid rgba(99, 102, 241, 0.2)',
                     boxShadow: '0 0 20px rgba(99, 102, 241, 0.1)'
                 }}>
-                    {hasPin ? <Lock size={40} strokeWidth={1.5} /> : <ShieldCheck size={40} strokeWidth={1.5} />}
+                    <ShieldCheck size={40} strokeWidth={1.5} />
                 </div>
 
                 <h1 style={{ fontSize: '2rem', marginBottom: '0.75rem', fontWeight: '800' }}>
-                    {hasPin ? 'Willkommen zurück' : 'Setup'}
+                    Authentifizierung
                 </h1>
+
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem', fontSize: '1.1rem' }}>
-                    {hasPin
-                        ? 'Bitte authentifizieren Sie sich.'
-                        : 'Sichern Sie Ihren Zugang mit einem PIN.'}
+                    {loading ? 'Prüfe Cloudflare Access...' : 'Authentifizierung wird durchgeführt...'}
                 </p>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <input
-                            type="password"
-                            className="input"
-                            value={pin}
-                            onChange={(e) => setPin(e.target.value)}
-                            placeholder={hasPin ? "PIN eingeben" : "Neuer PIN"}
-                            autoFocus
-                            style={{
-                                textAlign: 'center',
-                                letterSpacing: '0.75rem',
-                                fontSize: '1.5rem',
-                                padding: '1rem',
-                                fontWeight: '700'
-                            }}
-                        />
-                    </div>
-
-                    {!hasPin && (
-                        <div className="input-group animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                            <input
-                                type="password"
-                                className="input"
-                                value={confirmPin}
-                                onChange={(e) => setConfirmPin(e.target.value)}
-                                placeholder="PIN bestätigen"
-                                style={{
-                                    textAlign: 'center',
-                                    letterSpacing: '0.75rem',
-                                    fontSize: '1.5rem',
-                                    padding: '1rem',
-                                    fontWeight: '700'
-                                }}
-                            />
-                        </div>
-                    )}
-
-                    {error && (
-                        <div style={{
-                            color: 'var(--danger)',
-                            marginBottom: '1.5rem',
-                            fontSize: '0.95rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            padding: '0.75rem',
-                            borderRadius: '8px'
-                        }}>
-                            <span>⚠️</span> {error}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginTop: '2rem'
+                }}>
+                    <Loader2
+                        size={24}
                         style={{
-                            width: '100%',
-                            padding: '1rem',
-                            fontSize: '1.1rem',
-                            justifyContent: 'center'
+                            animation: 'spin 1s linear infinite',
+                            color: 'var(--primary)'
                         }}
-                    >
-                        {hasPin ? 'Entsperren' : 'Speichern'}
-                        <ChevronRight size={20} />
-                    </button>
-                </form>
+                    />
+                </div>
+
+                {!loading && !isAuthenticated && (
+                    <div style={{
+                        color: 'var(--warning)',
+                        marginTop: '2rem',
+                        fontSize: '0.95rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        background: 'rgba(251, 191, 36, 0.1)',
+                        padding: '0.75rem',
+                        borderRadius: '8px'
+                    }}>
+                        <span>⚠️</span>
+                        <span>Bitte stellen Sie sicher, dass Sie über Cloudflare Access zugreifen.</span>
+                    </div>
+                )}
             </div>
+
+            <style>{`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };

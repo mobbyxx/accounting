@@ -1,10 +1,63 @@
 import React from 'react';
-import { LayoutDashboard, Receipt, PieChart, Settings, Wallet } from 'lucide-react';
+import { LayoutDashboard, Receipt, PieChart, Settings, Wallet, LogOut, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
+
+const LoggedInUser: React.FC = () => {
+  const { user, logout } = useAuth();
+
+  if (!user) return null;
+
+  return (
+    <div style={{
+      marginTop: '1rem',
+      padding: '1rem',
+      borderRadius: '12px',
+      background: 'var(--bg-app)',
+      border: '1px solid var(--border)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <div style={{
+          width: '36px',
+          height: '36px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0
+        }}>
+          <User size={18} color="white" />
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {user.name}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {user.email}
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={logout}
+        className="btn btn-secondary"
+        style={{
+          width: '100%',
+          fontSize: '0.875rem',
+          padding: '0.5rem 0.75rem',
+          justifyContent: 'center'
+        }}
+      >
+        <LogOut size={16} />
+        <span>Abmelden</span>
+      </button>
+    </div>
+  );
+};
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
@@ -68,16 +121,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Settings size={20} />
             <span>Einstellungen</span>
           </Link>
-          <div style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            borderRadius: '12px',
-            background: 'var(--bg-app)',
-            border: '1px solid var(--border)'
-          }}>
-            <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.25rem' }}>Pro Plan</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Gültig bis 31.12.2025</div>
-          </div>
+          <LoggedInUser />
         </div>
       </aside>
       <main className="main-content animate-fade-in">

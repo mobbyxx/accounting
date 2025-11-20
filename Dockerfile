@@ -1,38 +1,41 @@
-# Multi-stage build für optimale Image-Größe
-FROM node:20-alpine AS builder
+FROM node:18-alpine AS base
 
 WORKDIR /app
 
-# Kopiere package files
+# Copy package files
 COPY package*.json ./
 
-# Installiere ALLE dependencies (inkl. devDependencies für den Build)
-RUN npm ci && \
-    npm cache clean --force
+# Install all dependencies
+RUN npm ci
 
-# Kopiere source code
+# Copy source code
 COPY . .
 
-# Build der Anwendung
+# Build the application
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM node:18-alpine
 
-# Installiere curl für healthcheck
-RUN apk add --no-cache curl
+WORKDIR /app
 
-# Kopiere built files
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy package files
+COPY package*.json ./
 
-# Kopiere nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Install only production dependencies
+RUN npm ci --only=production
+
+# Copy built frontend from build stage
+COPY --from=base /app/dist ./dist
+
+# Copy server file
+COPY server.js ./
 
 # Expose port
-EXPOSE 80
+EXPOSE 3000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
+# Set environment
+ENV NODE_ENV=production
 
-CMD ["nginx", "-g", "daemon off;"]
+# Start server
+CMD ["node", "server.js"]

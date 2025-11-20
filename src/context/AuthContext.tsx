@@ -1,60 +1,72 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+interface User {
+    email: string;
+    name: string;
+    sub: string;
+}
+
 interface AuthContextType {
     isAuthenticated: boolean;
-    hasPin: boolean;
-    login: (pin: string) => boolean;
-    setupPin: (pin: string) => void;
+    user: User | null;
+    loading: boolean;
     logout: () => void;
+    checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const PIN_STORAGE_KEY = 'accounting_app_pin';
 const SESSION_KEY = 'accounting_app_session';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [hasPin, setHasPin] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    const checkAuth = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/user`, {
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+
+            if (response.ok) {
+                const userData = await response.json();
+                setUser(userData);
+                setIsAuthenticated(true);
+                sessionStorage.setItem(SESSION_KEY, 'true');
+            } else {
+                setIsAuthenticated(false);
+                setUser(null);
+                sessionStorage.removeItem(SESSION_KEY);
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            setIsAuthenticated(false);
+            setUser(null);
+            sessionStorage.removeItem(SESSION_KEY);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const storedPin = localStorage.getItem(PIN_STORAGE_KEY);
-        if (storedPin) {
-            setHasPin(true);
-            const session = sessionStorage.getItem(SESSION_KEY);
-            if (session === 'true') {
-                setIsAuthenticated(true);
-            }
-        }
+        checkAuth();
     }, []);
-
-    const login = (pin: string) => {
-        const storedPin = localStorage.getItem(PIN_STORAGE_KEY);
-        const inputHash = btoa(pin);
-
-        if (inputHash === storedPin) {
-            setIsAuthenticated(true);
-            sessionStorage.setItem(SESSION_KEY, 'true');
-            return true;
-        }
-        return false;
-    };
-
-    const setupPin = (pin: string) => {
-        const hash = btoa(pin);
-        localStorage.setItem(PIN_STORAGE_KEY, hash);
-        setHasPin(true);
-        setIsAuthenticated(true);
-        sessionStorage.setItem(SESSION_KEY, 'true');
-    };
 
     const logout = () => {
         setIsAuthenticated(false);
+        setUser(null);
         sessionStorage.removeItem(SESSION_KEY);
+        // Redirect to Cloudflare Access logout
+        window.location.href = '/cdn-cgi/access/logout';
     };
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, hasPin, login, setupPin, logout }}>
+        <AuthContext.Provider value={{ isAuthenticated, user, loading, logout, checkAuth }}>
             {children}
         </AuthContext.Provider>
     );
