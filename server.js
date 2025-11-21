@@ -3,8 +3,13 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
 import pkg from 'pg';
 const { Pool } = pkg;
+
+// Import services
+import { sendTestEmail } from './services/emailService.js';
+import { initializeScheduler, refreshUserNotification } from './services/schedulerService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,58 +52,70 @@ pool.on('connect', async (client) => {
     }
 });
 
-// Automatische Migration beim Server-Start
+// Verbesserte Migration mit SQL-Files aus migrations/
 const runMigrations = async () => {
     const client = await pool.connect();
     try {
         console.log('🔄 Running database migrations...');
 
-        // Migration 1: Add user_id to transactions if not exists
+        // Erstelle migrations Tracking-Tabelle
         await client.query(`
-            DO $$ 
-            BEGIN
-                -- Add user_id column if it doesn't exist
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_schema = 'accounting' 
-                    AND table_name = 'transactions' 
-                    AND column_name = 'user_id'
-                ) THEN
-                    ALTER TABLE accounting.transactions 
-                    ADD COLUMN user_id UUID;
-                    
-                    RAISE NOTICE 'Added user_id column to transactions';
-                END IF;
-                
-                -- Add index if it doesn't exist
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes 
-                    WHERE schemaname = 'accounting' 
-                    AND tablename = 'transactions' 
-                    AND indexname = 'idx_transactions_user_id'
-                ) THEN
-                    CREATE INDEX idx_transactions_user_id ON accounting.transactions(user_id);
-                    RAISE NOTICE 'Created index idx_transactions_user_id';
-                END IF;
-                
-                -- Add foreign key constraint if it doesn't exist
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.table_constraints 
-                    WHERE constraint_schema = 'accounting' 
-                    AND table_name = 'transactions' 
-                    AND constraint_name = 'fk_transactions_user_id'
-                ) THEN
-                    -- Only add FK if user_id is populated (avoid errors with NULL values)
-                    -- In production, you might need to manually set user_id for existing transactions first
-                    -- ALTER TABLE accounting.transactions 
-                    -- ADD CONSTRAINT fk_transactions_user_id 
-                    -- FOREIGN KEY (user_id) REFERENCES accounting.users(id) ON DELETE CASCADE;
-                    RAISE NOTICE 'Skipped FK constraint (set user_id manually first)';
-                END IF;
-            END $$;
+            CREATE TABLE IF NOT EXISTS accounting.migrations (
+                id SERIAL PRIMARY KEY,
+                filename VARCHAR(255) UNIQUE NOT NULL,
+                executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
         `);
 
-        console.log('✅ Database migrations completed');
+        // Lese alle SQL-Dateien aus migrations/
+        const migrationsDir = path.join(__dirname, 'migrations');
+        let migrationFiles = [];
+
+        try {
+            const files = await fs.readdir(migrationsDir);
+            migrationFiles = files
+                .filter(f => f.endsWith('.sql'))
+                .sort(); // Alphabetisch sortieren (001, 002, ...)
+        } catch (err) {
+            console.log('⚠️  No migrations directory found, skipping file-based migrations');
+        }
+
+        // Führe jede Migration aus (falls noch nicht ausgeführt)
+        for (const filename of migrationFiles) {
+            // Prüfen ob bereits ausgeführt
+            const check = await client.query(
+                'SELECT 1 FROM accounting.migrations WHERE filename = $1',
+                [filename]
+            );
+
+            if (check.rows.length > 0) {
+                console.log(`⏭️  Skipping ${filename} (already executed)`);
+                continue;
+            }
+
+            console.log(`🔄 Running migration: ${filename}`);
+
+            // SQL-Datei lesen und ausführen
+            const sqlPath = path.join(migrationsDir, filename);
+            const sql = await fs.readFile(sqlPath, 'utf-8');
+
+            await client.query('BEGIN');
+            try {
+                await client.query(sql);
+                await client.query(
+                    'INSERT INTO accounting.migrations (filename) VALUES ($1)',
+                    [filename]
+                );
+                await client.query('COMMIT');
+                console.log(`✅ Migration ${filename} completed`);
+            } catch (err) {
+                await client.query('ROLLBACK');
+                console.error(`❌ Migration ${filename} failed:`, err);
+                throw err;
+            }
+        }
+
+        console.log('✅ All database migrations completed');
     } catch (err) {
         console.error('❌ Migration error:', err);
         // Don't crash the server, just log the error
@@ -392,6 +409,182 @@ app.post('/api/sync', verifyCloudflareJWT, async (req, res) => {
     }
 });
 
+// ==================== E-Mail Settings API ====================
+
+// GET /api/settings - Lade E-Mail-Einstellungen des Users
+app.get('/api/settings', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const client = await pool.connect();
+        try {
+            const userId = await ensureUser(client, req.user);
+
+            const result = await client.query(
+                `SELECT 
+                    smtp_host, 
+                    smtp_port, 
+                    smtp_secure, 
+                    smtp_user,
+                    notification_enabled,
+                    notification_day,
+                    notification_hour,
+                    notification_minute
+                 FROM user_settings
+                 WHERE user_id = $1`,
+                [userId]
+            );
+
+            // Wenn keine Einstellungen vorhanden, Standardwerte zurückgeben
+            if (result.rows.length === 0) {
+                return res.json({
+                    smtp_host: '',
+                    smtp_port: 587,
+                    smtp_secure: false,
+                    smtp_user: '',
+                    notification_enabled: false,
+                    notification_day: 0, // Sonntag
+                    notification_hour: 12,
+                    notification_minute: 0,
+                });
+            }
+
+            res.json(result.rows[0]);
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in GET /api/settings:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PUT /api/settings - Speichere/Aktualisiere E-Mail-Einstellungen
+app.put('/api/settings', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const {
+            smtp_host,
+            smtp_port,
+            smtp_secure,
+            smtp_user,
+            smtp_password,
+            notification_enabled,
+            notification_day,
+            notification_hour,
+            notification_minute,
+        } = req.body;
+
+        // Validierung
+        if (notification_enabled) {
+            if (!smtp_host || !smtp_user || !smtp_password) {
+                return res.status(400).json({
+                    error: 'SMTP configuration required when notifications are enabled'
+                });
+            }
+        }
+
+        const client = await pool.connect();
+        try {
+            const userId = await ensureUser(client, req.user);
+
+            // Upsert: Update if exists, insert if not
+            await client.query(
+                `INSERT INTO user_settings (
+                    user_id, 
+                    smtp_host, 
+                    smtp_port, 
+                    smtp_secure, 
+                    smtp_user, 
+                    smtp_password,
+                    notification_enabled,
+                    notification_day,
+                    notification_hour,
+                    notification_minute
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    smtp_host = $2,
+                    smtp_port = $3,
+                    smtp_secure = $4,
+                    smtp_user = $5,
+                    smtp_password = CASE WHEN $6 != '' THEN $6 ELSE user_settings.smtp_password END,
+                    notification_enabled = $7,
+                    notification_day = $8,
+                    notification_hour = $9,
+                    notification_minute = $10,
+                    updated_at = CURRENT_TIMESTAMP`,
+                [
+                    userId,
+                    smtp_host,
+                    smtp_port,
+                    smtp_secure,
+                    smtp_user,
+                    smtp_password || '', // Leeres Passwort = nicht ändern
+                    notification_enabled,
+                    notification_day,
+                    notification_hour,
+                    notification_minute,
+                ]
+            );
+
+            // Scheduler aktualisieren
+            await refreshUserNotification(pool, userId);
+
+            res.json({
+                success: true,
+                message: 'Einstellungen gespeichert'
+            });
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error in PUT /api/settings:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/settings/test-email - Sende Test-E-Mail
+app.post('/api/settings/test-email', verifyCloudflareJWT, async (req, res) => {
+    try {
+        const {
+            smtp_host,
+            smtp_port,
+            smtp_secure,
+            smtp_user,
+            smtp_password,
+        } = req.body;
+
+        // Validierung
+        if (!smtp_host || !smtp_user || !smtp_password) {
+            return res.status(400).json({
+                error: 'SMTP configuration incomplete'
+            });
+        }
+
+        const smtpConfig = {
+            host: smtp_host,
+            port: smtp_port,
+            secure: smtp_secure,
+            user: smtp_user,
+            password: smtp_password,
+        };
+
+        // Test-E-Mail senden
+        await sendTestEmail(req.user.email, req.user.name, smtpConfig);
+
+        res.json({
+            success: true,
+            message: 'Test-E-Mail wurde versendet!'
+        });
+    } catch (error) {
+        console.error('Error sending test email:', error);
+        res.status(500).json({
+            error: 'Failed to send test email',
+            message: error.message
+        });
+    }
+});
+
+
 // Health Check
 app.get('/api/health', async (req, res) => {
     try {
@@ -422,6 +615,9 @@ const startServer = async () => {
 
         // Führe Migrationen aus
         await runMigrations();
+
+        // Initialisiere E-Mail Scheduler
+        await initializeScheduler(pool);
 
         // Starte Express Server
         app.listen(PORT, () => {

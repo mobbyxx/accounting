@@ -3,6 +3,7 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { EURReport } from './pages/EURReport';
+import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -46,6 +47,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <EURReport />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Settings />
                 </Layout>
               </ProtectedRoute>
             }
