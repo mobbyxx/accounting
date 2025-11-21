@@ -31,6 +31,10 @@ COPY --from=base /app/dist ./dist
 # Copy server file
 COPY server.js ./
 
+# Copy services and migrations
+COPY services ./services
+COPY migrations ./migrations
+
 # Expose port
 EXPOSE 3000
 
